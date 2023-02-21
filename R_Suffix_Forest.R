@@ -6,15 +6,17 @@ build <- function(suffix) {
   h_node <- hashmap()
   h_node[["item"]] <- suffix[[1]]
   
-  h_node[["children"]] <- list()
-  h_node[["leaf"]] <- list()
+  h_node[["children"]] <- hashset()
+  h_node[["leaf"]] <- hashmap()
   
   if(length(suffix) == 2) {
-    h_node[["leaf"]] <- append(h_node[["leaf"]], suffix[2])
+      x <- names(suffix[2])
+      y <- list(suffix[[2]])
+      insert(h_node[["leaf"]],x,y)
   }
   else{
-    len <- length(suffix)
-    h_node[["children"]] <- append(h_node[["children"]], build(suffix[2:len]))
+      len <- length(suffix)
+      insert(h_node[["children"]],build(suffix[2:len]))
   }
   
   return(h_node)
@@ -23,7 +25,10 @@ build <- function(suffix) {
 match <- function(h_node, suffix) {
   if (length(suffix) == 2){
     if(length(h_node[["leaf"]]) == 0){
-      h_node[["leaf"]]  <- list(suffix[2])
+        h_node[["leaf"]] <- hashmap()
+        for(n in names(suffix[2])){
+            insert(h_node[["leaf"]],n,list(suffix[2][[n]]))
+        }
     }
     else {
       tree_leaf <- h_node[["leaf"]]
@@ -31,52 +36,56 @@ match <- function(h_node, suffix) {
       state <- names(suffix[2])
       type <- suffix[[2]]
       #########################################
-      if (state %in% names(tree_leaf)){
+      if (state %in% keys(tree_leaf)){
         x <- tree_leaf[[state]]
-        if (type %in% x){
+        
+        if (type %in% tree_leaf[[state]][[1]]){
           print("Warning: Same row already exists in forest !")
         }
         else{
-          tree_leaf[[state]] <- append(tree_leaf[[state]], type)
+            tree_leaf[[state]][[1]] <- append(tree_leaf[[state]][[1]] ,type)
+           
         }
       }
       else{
-        tree_leaf[[state]] <- list(type)
+       tree_leaf[[state]] <- list(type)
       }
       
       h_node[["leaf"]] <- tree_leaf
     }
   }
   else{
-    
+    found <- FALSE
     if(length(h_node[["children"]]) > 0){
-      for (i in 1 : length(h_node[["children"]])){
-        child <- h_node[["children"]][[i]]
+      for (i in keys(h_node[["children"]])){
+            child <- i
         if (child[["item"]] == suffix[[2]]){
-          t <- length(suffix)
-          h_node[["children"]][[i]] <- match(child, suffix[2:t])
-          return
+            t <- length(suffix) 
+            match(child, suffix[2:t])
+            found <- TRUE
+            break
+            return
         }
       }
     }
-    
+    if(found == FALSE){
     len <- length(suffix)
-    temp <- build(suffix[1:len])
-    h_node[["children"]] <- append(h_node[["children"]], temp)
-    
+    temp <- build(suffix[2:len])
+    insert(h_node[["children"]],temp)
+    }
   }
   
-  return(h_node)
+ # return(h_node)
   
 }
-
-
 
 get_suffix <- function(arr, idx, state, type) {
   suffix <- list()
   
   for(i in idx:length(arr)){
+      if(!arr[i] %in% suffix){
     suffix <- append(suffix, arr[i])
+          }
   }
   
   suffix[[state]] <- list(type)
@@ -85,66 +94,41 @@ get_suffix <- function(arr, idx, state, type) {
 }
 
 get_all_suffix <- function(arr, state, type){
-  all_suffix = list()
+  all_suffix <- hashset()
   
   for (i in 1 : length(arr)){
-    suffix = get_suffix(arr, i, state, type)
-    all_suffix <- append(all_suffix, list(suffix))
+    suffix <- get_suffix(arr, i, state, type)
+      insert(all_suffix,suffix)
   }
-  
-  
+ 
   return (all_suffix)
 }
 
 
 
-sufix_forest_build <- function(name , SFD_List){
+sufix_forest_build <- function(SFD_List){
   h_tree <- hashmap()
-  SFD <- SFD_List
-  
-  for(state in keys(SFD)) {
-    arr <- SFD[[state]]
-    suffixes <- get_all_suffix(arr, state, name)
+ 
+  for(k in keys(SFD_List)){
+    SFD <- SFD_List[[k]]
+   for(state in keys(SFD)) {
+     arr <- SFD[[state]]
+     suffixes <- get_all_suffix(arr,state,k)
     
-    for(i in 1:length(suffixes)){
-      suffix = suffixes[[i]]
-      if(has_key(h_tree, suffix[[1]])) {
-        res = match(h_tree[suffix[[1]]], suffix)
-        insert(h_tree, suffix[[1]], res)
+     for(i in keys(suffixes)){
+       suffix <- i
+       if(has_key(h_tree, suffix[[1]])) {
+           match(h_tree[[suffix[[1]]]], suffix)
+         #insert(h_tree, suffix[[1]], res)
       }
-      else {
-        h_tree[[suffix[[1]]]] <- build(suffix)
+       else {
+         h_tree[[suffix[[1]]]] <- build(suffix)
       }
     }
   }
-  
+  }
   return(h_tree)
 }
 
-
-SFD_mdm <- hashmap()
-SFD_mdm[["AP"]] <- c(3, 14, 15, 16, 31)
-SFD_mdm[["GU"]] <- c(1, 2, 3, 14, 15, 16, 31)
-SFD_mdm[["OD"]] <- c(1, 2, 14, 15, 31)
-SFD_mdm[["ANI"]]<- c(16, 31)
-
-
-SFD_om = hashmap()
-
-SFD_om[["AP"]]<- c(3, 4, 5, 14,15, 16, 31)
-SFD_om[["MA"]] <- c(3)
-SFD_om[["KE"]] <- c(2, 14, 15, 16, 31)
-SFD_om[["WB"]] <- c(4, 5, 14, 15)
-SFD_om[["ANI"]]  <- c(2)
-
-forest <- sufix_forest_build("om",  SFD_om)
-print(forest[[31]][["leaf"]])
-for(l in keys(forest)){
-  print(paste(l, "->" , forest[[l]]))
-
-}
-# save(l, file = "output_1.RData")
-#jsonData <- toJSON(forest[[l]])
-#write(jsonData,"output2.json")
-
-
+forest <- hashmap()
+forest <- sufix_forest_build(SFDS)
